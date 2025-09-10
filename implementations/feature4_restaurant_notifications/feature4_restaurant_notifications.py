@@ -1,7 +1,5 @@
 from flask import Flask, Response, request, jsonify
 import redis
-import threading
-import time
 import os
 
 app = Flask(__name__)
@@ -16,15 +14,19 @@ def publish_order(order_data):
 @app.route("/place_order", methods=["POST"])
 def place_order():
     order_data = request.json
-    r.publish("new_orders", str(order_data))
-    return jsonify({"status": "order published"})
+    # Publish to restaurant-specific channel
+    restaurant_id = order_data.get("restaurant_id")
+    if restaurant_id is not None:
+        r.publish(f"restaurant_{restaurant_id}_orders", str(order_data))
+        return jsonify({"status": "order published"})
+    return jsonify({"error": "restaurant_id required"}), 400
 
 # Endpoint for restaurants to stream new orders
 @app.route("/restaurant/<int:restaurant_id>/orders/stream")
 def stream_orders(restaurant_id):
     def event_stream():
         pubsub = r.pubsub()
-        pubsub.subscribe("new_orders")
+        pubsub.subscribe(f"restaurant_{restaurant_id}_orders")
         for message in pubsub.listen():
             if message["type"] == "message":
                 yield f"data: {message['data'].decode()}\n\n"
