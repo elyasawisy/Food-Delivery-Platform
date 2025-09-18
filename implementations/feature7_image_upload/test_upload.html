@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FoodFast Image Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .upload-section { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .progress-container { margin: 20px 0; }
+        .progress-bar { width: 100%; height: 20px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background-color: #007bff; transition: width 0.3s ease; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .status.info { background-color: #cce7ff; color: #004085; }
+        .status.processing { background-color: #fff3cd; color: #856404; }
+        .form-group { margin: 15px 0; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+        .form-group input[type="file"] { width: 100%; }
+        button { 
+            padding: 10px 20px; margin: 5px; background-color: #007bff; 
+            color: white; border: none; border-radius: 3px; cursor: pointer; 
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .preview { margin: 10px 0; }
+        .preview img { max-width: 300px; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; }
+        .results { margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
+        .file-info { background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FoodFast Image Upload Test</h1>
+        
+        <div class="upload-section">
+            <h2>Upload Menu Item Image</h2>
+            
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="restaurantId">Restaurant ID:</label>
+                    <input type="number" id="restaurantId" name="restaurant_id" value="1" min="1" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="imageFile">Select Image:</label>
+                    <input type="file" id="imageFile" name="image" accept="image/*" required>
+                </div>
+                
+                <div class="preview" id="preview" style="display: none;">
+                    <img id="previewImage" alt="Preview">
+                </div>
+                
+                <div class="file-info" id="fileInfo" style="display: none;"></div>
+                
+                <button type="submit" id="uploadBtn">Upload Image</button>
+                <button type="button" onclick="resetForm()" id="resetBtn">Reset</button>
+            </form>
+            
+            <div id="status" class="status" style="display: none;"></div>
+            
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                </div>
+                <div id="progressText">0%</div>
+            </div>
+            
+            <div id="results" class="results" style="display: none;"></div>
+        </div>
+        
+        <div class="upload-section">
+            <h2>Restaurant Uploads History</h2>
+            <button onclick="loadUploads()">Load Upload History</button>
+            <div id="uploadsHistory"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let eventSource = null;
+        const BASE_URL = 'http://127.0.0.1:5000';  // Changed from 5000 to 5007
+
+        // File preview
+        document.getElementById('imageFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Show file info
+                const fileInfo = document.getElementById('fileInfo');
+                fileInfo.innerHTML = `
+                    <strong>File Info:</strong><br>
+                    Name: ${file.name}<br>
+                    Size: ${formatFileSize(file.size)}<br>
+                    Type: ${file.type}
+                `;
+                fileInfo.style.display = 'block';
+
+                // Show preview for images
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('previewImage').src = e.target.result;
+                        document.getElementById('preview').style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                document.getElementById('preview').style.display = 'none';
+                document.getElementById('fileInfo').style.display = 'none';
+            }
+        });
+
+        // Upload form submission
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            uploadImage();
+        });
+
+        function uploadImage() {
+            const formData = new FormData();
+            const imageFile = document.getElementById('imageFile').files[0];
+            const restaurantId = document.getElementById('restaurantId').value;
+
+            if (!imageFile) {
+                showStatus('Please select an image file', 'error');
+                return;
+            }
+
+            if (!restaurantId) {
+                showStatus('Please enter restaurant ID', 'error');
+                return;
+            }
+
+            formData.append('image', imageFile);
+            formData.append('restaurant_id', restaurantId);
+
+            // Disable upload button
+            document.getElementById('uploadBtn').disabled = true;
+            showStatus('Uploading image...', 'info');
+            showProgress(0);
+
+            fetch(`${BASE_URL}/api/upload`, {
+                method: 'POST',
+                body: formData,
+                mode: 'cors',  // Add CORS mode
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    currentJobId = data.job_id;
+                    showStatus(`Upload successful! Job ID: ${data.job_id}`, 'success');
+                    startProgressTracking(data.job_id);
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showStatus('Upload failed: ' + error.message, 'error');
+                document.getElementById('uploadBtn').disabled = false;
+            });
+        }
+
+        function startProgressTracking(jobId) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource(`${BASE_URL}/api/upload/status/${jobId}`);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleProgressUpdate(data);
+                } catch (e) {
+                    console.error('Error parsing SSE data:', e);
+                }
+            };
+
+            eventSource.onerror = function(event) {
+                console.error('SSE error:', event);
+                showStatus('Connection error. Please check upload status manually.', 'error');
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+            };
+        }
+
+        function handleProgressUpdate(data) {
+            console.log('Progress update:', data);
+
+            if (data.error) {
+                showStatus(`Error: ${data.error}`, 'error');
+                document.getElementById('uploadBtn').disabled = false;
+                if (eventSource) {
+                    eventSource.close();
+                }
+                return;
+            }
+
+            const status = data.status;
+            const progress = data.progress || 0;
+            const message = data.message || '';
+
+            // Update progress bar
+            showProgress(progress);
+
+            // Update status message
+            let statusClass = 'info';
+            if (status === 'completed') {
+                statusClass = 'success';
+                document.getElementById('uploadBtn').disabled = false;
+                if (eventSource) {
+                    eventSource.close();
+                }
+                showResults(data);
+            } else if (status === 'failed') {
+                statusClass = 'error';
+                document.getElementById('uploadBtn').disabled = false;
+                if (eventSource) {
+                    eventSource.close();
+                }
+            } else if (status === 'processing') {
+                statusClass = 'processing';
+            }
+
+            showStatus(`${status.toUpperCase()}: ${message}`, statusClass);
+        }
+
+        function showProgress(progress) {
+            const container = document.getElementById('progressContainer');
+            const fill = document.getElementById('progressFill');
+            const text = document.getElementById('progressText');
+
+            container.style.display = 'block';
+            fill.style.width = `${progress}%`;
+            text.textContent = `${progress}%`;
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function showResults(data) {
+            const resultsEl = document.getElementById('results');
+            
+            if (data.results) {
+                const results = data.results;
+                resultsEl.innerHTML = `
+                    <h3>Processing Results</h3>
+                    <p><strong>Status:</strong> ${data.status}</p>
+                    <p><strong>Original Size:</strong> ${formatFileSize(results.original_size)}</p>
+                    <p><strong>Optimized Size:</strong> ${formatFileSize(results.optimized_size)}</p>
+                    <p><strong>Thumbnail Size:</strong> ${formatFileSize(results.thumbnail_size)}</p>
+                    <p><strong>Dimensions:</strong> ${results.dimensions}</p>
+                    <p><strong>Optimized URL:</strong> <code>${results.optimized_url}</code></p>
+                    <p><strong>Thumbnail URL:</strong> <code>${results.thumbnail_url}</code></p>
+                    <p><strong>Processed At:</strong> ${new Date(results.processed_at).toLocaleString()}</p>
+                `;
+            } else {
+                resultsEl.innerHTML = `
+                    <h3>Upload Complete</h3>
+                    <p>Status: ${data.status}</p>
+                    <p>Job ID: ${currentJobId}</p>
+                `;
+            }
+            
+            resultsEl.style.display = 'block';
+        }
+
+        function resetForm() {
+            document.getElementById('uploadForm').reset();
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = false;
+            
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            currentJobId = null;
+        }
+
+        function loadUploads() {
+            const restaurantId = document.getElementById('restaurantId').value;
+            
+            if (!restaurantId) {
+                alert('Please enter restaurant ID');
+                return;
+            }
+
+            fetch(`${BASE_URL}/api/uploads/${restaurantId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'  // Add CORS mode
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const historyEl = document.getElementById('uploadsHistory');
+                
+                if (data.success && data.uploads && data.uploads.length > 0) {
+                    let html = '<h3>Upload History</h3><table border="1" style="width: 100%; border-collapse: collapse;">';
+                    html += '<tr><th>ID</th><th>Filename</th><th>Status</th><th>Created</th><th>Completed</th><th>Actions</th></tr>';
+                    
+                    data.uploads.forEach(upload => {
+                        const createdAt = new Date(upload.created_at).toLocaleString();
+                        const completedAt = upload.completed_at ? new Date(upload.completed_at).toLocaleString() : 'N/A';
+                        
+                        html += `
+                            <tr>
+                                <td>${upload.id}</td>
+                                <td>${upload.filename}</td>
+                                <td><span class="status-${upload.status}">${upload.status}</span></td>
+                                <td>${createdAt}</td>
+                                <td>${completedAt}</td>
+                                <td><button onclick="checkJobStatus(${upload.id})">Check Status</button></td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</table>';
+                    historyEl.innerHTML = html;
+                } else {
+                    historyEl.innerHTML = '<p>No uploads found for this restaurant.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading uploads:', error);
+                document.getElementById('uploadsHistory').innerHTML = `<p class="error">Error loading upload history: ${error.message}</p>`;
+            });
+        }
+
+        function checkJobStatus(jobId) {
+            fetch(`${BASE_URL}/api/upload/status/${jobId}/json`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const job = data.job;
+                        alert(`
+Job ID: ${job.id}
+Restaurant: ${job.restaurant_name || job.restaurant_id}
+Filename: ${job.filename}
+Status: ${job.status}
+Created: ${new Date(job.created_at).toLocaleString()}
+Completed: ${job.completed_at ? new Date(job.completed_at).toLocaleString() : 'N/A'}
+                        `);
+                    } else {
+                        alert('Job not found');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking status:', error);
+                    alert('Error checking job status');
+                });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

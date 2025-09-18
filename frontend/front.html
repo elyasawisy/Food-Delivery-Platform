@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodFast - Backend Communication Patterns Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .feature-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .pattern-badge {
+            background: #e8f4fd;
+            color: #2980b9;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            margin-left: auto;
+        }
+
+        .feature-content {
+            margin-bottom: 20px;
+        }
+
+        .feature-description {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .demo-section h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .output-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px 5px 2px 0;
+            display: inline-block;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .auth-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .user-info {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+        }
+
+        .message.user {
+            background: #007bff;
+            color: white;
+            margin-left: 20%;
+        }
+
+        .message.support {
+            background: #f1f1f1;
+            margin-right: 20%;
+        }
+
+        .message.system {
+            background: #ffc107;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 768px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍕 FoodFast Backend Demo</h1>
+            <p>Testing Communication Patterns: Sync/Async, SSE, WebSockets, Pub/Sub</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="auth-section">
+            <h3>Authentication (Feature 1: Request/Response + Transactions)</h3>
+            <div id="connectionStatus" class="error">Backend Status: Checking...</div>
+            
+            <div id="loginForm">
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="loginEmail" value="elyas@example.com" placeholder="Enter email">
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="loginPassword" value="securepassword123" placeholder="Enter password">
+                </div>
+                <button class="btn" onclick="login()">Login</button>
+                <button class="btn btn-secondary" onclick="showRegister()">Register</button>
+            </div>
+
+            <div id="registerForm" class="hidden">
+                <div class="form-group">
+                    <label>Name:</label>
+                    <input type="text" id="regName" placeholder="Full Name" value="Test User">
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="regEmail" placeholder="Email" value="test@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="regPassword" placeholder="Password" value="password123">
+                </div>
+                <div class="form-group">
+                    <label>Phone (Optional):</label>
+                    <input type="text" id="regPhone" placeholder="+1234567890" value="+1234567890">
+                </div>
+                <div class="form-group">
+                    <label>Role:</label>
+                    <select id="regRole">
+                        <option value="customer">Customer</option>
+                        <option value="driver">Driver</option>
+                        <option value="restaurant">Restaurant</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="register()">Register</button>
+                <button class="btn btn-secondary" onclick="showLogin()">Back to Login</button>
+            </div>
+
+            <div id="userInfo" class="user-info hidden">
+                <h4>Logged in as: <span id="userName"></span> (<span id="userRole"></span>)</h4>
+                <p>User ID: <span id="userId"></span></p>
+                <button class="btn" onclick="getProfile()">Get Profile</button>
+                <button class="btn btn-success" onclick="updateProfile()">Update Profile</button>
+                <button class="btn btn-warning" onclick="addPaymentMethod()">Add Payment Method</button>
+                <button class="btn btn-secondary" onclick="logout()">Logout</button>
+            </div>
+
+            <div id="profileOutput" class="output-box">Authentication results will appear here...</div>
+        </div>
+
+        <div class="features-grid">
+            <!-- Feature 2: Order Tracking (SSE) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">2</div>
+                    <div class="feature-title">Order Tracking</div>
+                    <div class="pattern-badge">Server-Sent Events</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">Real-time order status updates using Server-Sent Events for efficient battery usage. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Demo:</h4>
+                        <div class="form-group">
+                            <label>Order ID:</label>
+                            <input type="number" id="trackOrderId" value="1">
+                        </div>
+                        <button class="btn" onclick="startOrderTracking()">Start Tracking</button>
+                        <button class="btn btn-secondary" onclick="stopOrderTracking()">Stop Tracking</button>
+                        <button class="btn btn-warning" onclick="updateOrderStatus()">Update Status (Test)</button>
+                    </div>
+                    <div id="orderTrackingOutput" class="output-box">Ready to track orders...</div>
+                </div>
+            </div>
+
+            <!-- Feature 3: Driver Location (WebSockets) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">3</div>
+                    <div class="feature-title">Driver Location</div>
+                    <div class="pattern-badge">WebSockets</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">Real-time bidirectional driver location updates with smooth map integration. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Driver Mode:</h4>
+                        <div class="form-group">
+                            <label>Latitude:</label>
+                            <input type="number" id="driverLat" value="31.7683" step="0.0001">
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude:</label>
+                            <input type="number" id="driverLng" value="35.2137" step="0.0001">
+                        </div>
+                        <button class="btn" onclick="connectAsDriver()">Connect as Driver</button>
+                        <button class="btn btn-success" onclick="sendLocationUpdate()">Send Location</button>
+                    </div>
+                    <div class="demo-section">
+                        <h4>Customer Mode:</h4>
+                        <div class="form-group">
+                            <label>Order ID to Track:</label>
+                            <input type="number" id="customerOrderId" value="1">
+                        </div>
+                        <button class="btn" onclick="trackDriverLocation()">Track Driver</button>
+                    </div>
+                    <div id="driverLocationOutput" class="output-box">WebSocket status: Disconnected</div>
+                </div>
+            </div>
+
+            <!-- Feature 4: Restaurant Notifications (Pub/Sub + SSE) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">4</div>
+                    <div class="feature-title">Restaurant Orders</div>
+                    <div class="pattern-badge">Pub/Sub + SSE</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">Instant order notifications to restaurants using RabbitMQ pub/sub and SSE. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Create Order:</h4>
+                        <div class="form-group">
+                            <label>Restaurant ID:</label>
+                            <input type="number" id="orderRestaurantId" value="1">
+                        </div>
+                        <button class="btn" onclick="createTestOrder()">Create Test Order</button>
+                    </div>
+                    <div class="demo-section">
+                        <h4>Restaurant Dashboard:</h4>
+                        <div class="form-group">
+                            <label>Restaurant ID:</label>
+                            <input type="number" id="restaurantId" value="1">
+                        </div>
+                        <button class="btn" onclick="startRestaurantStream()">Start Listening</button>
+                        <button class="btn btn-secondary" onclick="stopRestaurantStream()">Stop Listening</button>
+                    </div>
+                    <div id="restaurantOutput" class="output-box">Ready to receive orders...</div>
+                </div>
+            </div>
+
+            <!-- Feature 5: Support Chat (WebSockets) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">5</div>
+                    <div class="feature-title">Support Chat</div>
+                    <div class="pattern-badge">WebSockets</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">Real-time chat with typing indicators and message delivery confirmations. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Chat:</h4>
+                        <button class="btn" onclick="joinSupportChat()">Join Chat</button>
+                        <div class="form-group">
+                            <input type="text" id="chatMessage" placeholder="Type your message..." onkeypress="handleChatKeyPress(event)">
+                        </div>
+                        <button class="btn" onclick="sendChatMessage()">Send Message</button>
+                        <button class="btn btn-secondary" onclick="toggleTyping()">Toggle Typing</button>
+                    </div>
+                    <div id="chatOutput" class="output-box">Join chat to start messaging...</div>
+                </div>
+            </div>
+
+            <!-- Feature 6: Announcements (Pub/Sub + Push) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">6</div>
+                    <div class="feature-title">Announcements</div>
+                    <div class="pattern-badge">Pub/Sub + Push</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">System-wide announcements broadcast to all users via pub/sub pattern. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Create Announcement:</h4>
+                        <div class="form-group">
+                            <label>Title:</label>
+                            <input type="text" id="announcementTitle" value="System Maintenance">
+                        </div>
+                        <div class="form-group">
+                            <label>Message:</label>
+                            <textarea id="announcementMessage" rows="3">The system will be under maintenance from 2-4 AM.</textarea>
+                        </div>
+                        <button class="btn" onclick="createAnnouncement()">Send Announcement</button>
+                    </div>
+                    <div class="demo-section">
+                        <h4>Listen for Announcements:</h4>
+                        <button class="btn" onclick="startAnnouncementStream()">Start Listening</button>
+                        <button class="btn btn-secondary" onclick="stopAnnouncementStream()">Stop Listening</button>
+                    </div>
+                    <div id="announcementOutput" class="output-box">Ready to receive announcements...</div>
+                </div>
+            </div>
+
+            <!-- Feature 7: Image Upload (Async + SSE) -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">7</div>
+                    <div class="feature-title">Image Upload</div>
+                    <div class="pattern-badge">Async + SSE</div>
+                </div>
+                <div class="feature-content">
+                    <p class="feature-description">Asynchronous image processing with real-time progress updates via SSE. (Mock Implementation)</p>
+                    <div class="demo-section">
+                        <h4>Upload Menu Image:</h4>
+                        <div class="form-group">
+                            <label>Restaurant ID:</label>
+                            <input type="number" id="uploadRestaurantId" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Select Image:</label>
+                            <input type="file" id="imageFile" accept="image/*">
+                        </div>
+                        <button class="btn" onclick="uploadImage()">Upload Image</button>
+                        <button class="btn btn-success" onclick="startImageProcessingStream()">Monitor Processing</button>
+                    </div>
+                    <div id="imageUploadOutput" class="output-box">Ready to upload images...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let authToken = null;
+        let currentUser = {};
+        let socket = null;
+        let orderTrackingSource = null;
+        let restaurantOrdersSource = null;
+        let announcementSource = null;
+        let imageProcessingSource = null;
+
+        // Updated API base URL to match your Flask backend
+        const API_BASE = 'http://localhost:5001';
+
+        // Initialize the application
+        window.onload = function() {
+            checkBackendConnection();
+            
+            // Try to load stored authentication
+            const storedToken = sessionStorage.getItem('authToken');
+            const storedUser = sessionStorage.getItem('currentUser');
+            
+            if (storedToken && storedUser) {
+                authToken = storedToken;
+                currentUser = JSON.parse(storedUser);
+                showUserInfo();
+            }
+        };
+
+        // Check backend connection
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    updateStatus('connectionStatus', 'Backend Status: Connected ✓', 'success');
+                } else {
+                    updateStatus('connectionStatus', 'Backend Status: Error', 'error');
+                }
+            } catch (error) {
+                updateStatus('connectionStatus', 'Backend Status: Offline ❌', 'error');
+                console.error('Backend connection error:', error);
+            }
+        }
+
+        // Authentication Functions
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                updateOutput('profileOutput', 'Please enter both email and password');
+                return;
+            }
+
+            try {
+                updateOutput('profileOutput', 'Logging in...');
+                
+                const response = await fetch(`${API_BASE}/users/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                updateOutput('profileOutput', `Login Response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+
+                    // Store in session storage
+                    sessionStorage.setItem('authToken', authToken);
+                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+                    showUserInfo();
+                    updateOutput('profileOutput', 'Login successful! ✓');
+                } else {
+                    updateOutput('profileOutput', `Login failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                updateOutput('profileOutput', `Login error: ${error.message}`);
+                console.error('Login error:', error);
+            }
+        }
+
+        async function register() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const phone = document.getElementById('regPhone').value;
+            const role = document.getElementById('regRole').value;
+
+            if (!name || !email || !password) {
+                updateOutput('profileOutput', 'Please fill in all required fields');
+                return;
+            }
+
+            try {
+                updateOutput('profileOutput', 'Registering user...');
+                
+                const userData = { name, email, password, role };
+                if (phone) userData.phone = phone;
+
+                const response = await fetch(`${API_BASE}/users/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const data = await response.json();
+                updateOutput('profileOutput', `Registration Response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok) {
+                    updateOutput('profileOutput', 'Registration successful! You can now login. ✓');
+                    showLogin();
+                    
+                    // Pre-fill login form
+                    document.getElementById('loginEmail').value = email;
+                    document.getElementById('loginPassword').value = password;
+                } else {
+                    updateOutput('profileOutput', `Registration failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                updateOutput('profileOutput', `Registration error: ${error.message}`);
+                console.error('Registration error:', error);
+            }
+        }
+
+        async function getProfile() {
+            if (!authToken) {
+                updateOutput('profileOutput', 'Please login first');
+                return;
+            }
+
+            try {
+                updateOutput('profileOutput', 'Getting profile...');
+                
+                const response = await fetch(`${API_BASE}/users/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                updateOutput('profileOutput', `Profile Data: ${JSON.stringify(data, null, 2)}`);
+
+                if (!response.ok) {
+                    updateOutput('profileOutput', `Profile fetch failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                updateOutput('profileOutput', `Profile error: ${error.message}`);
+                console.error('Profile error:', error);
+            }
+        }
+
+        async function updateProfile() {
+            if (!authToken) {
+                updateOutput('profileOutput', 'Please login first');
+                return;
+            }
+
+            const newName = prompt('Enter new name:', currentUser.name || '');
+            const newPhone = prompt('Enter new phone (optional):', '');
+
+            if (!newName) {
+                updateOutput('profileOutput', 'Name is required');
+                return;
+            }
+
+            try {
+                updateOutput('profileOutput', 'Updating profile...');
+                
+                const updateData = { name: newName };
+                if (newPhone) updateData.phone = newPhone;
+
+                const response = await fetch(`${API_BASE}/users/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                const data = await response.json();
+                updateOutput('profileOutput', `Update Response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok) {
+                    updateOutput('profileOutput', 'Profile updated successfully! ✓');
+                    currentUser.name = newName;
+                    document.getElementById('userName').textContent = newName;
+                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                } else {
+                    updateOutput('profileOutput', `Update failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                updateOutput('profileOutput', `Update error: ${error.message}`);
+                console.error('Update error:', error);
+            }
+        }
+
+        async function addPaymentMethod() {
+            if (!authToken) {
+                updateOutput('profileOutput', 'Please login first');
+                return;
+            }
+
+            const cardNumber = prompt('Enter card number (16 digits):', '1234567890123456');
+            const cardHolder = prompt('Enter card holder name:', currentUser.name || '');
+            const expiryMonth = prompt('Enter expiry month (1-12):', '12');
+            const expiryYear = prompt('Enter expiry year (YYYY):', '2029');
+            const cvv = prompt('Enter CVV (3 digits):', '123');
+
+            if (!cardNumber || !cardHolder || !expiryMonth || !expiryYear || !cvv) {
+                updateOutput('profileOutput', 'All payment fields are required');
+                return;
+            }
+
+            try {
+                updateOutput('profileOutput', 'Adding payment method...');
+                
+                const paymentData = {
+                    card_number: cardNumber,
+                    card_holder: cardHolder,
+                    expiry_month: parseInt(expiryMonth),
+                    expiry_year: parseInt(expiryYear),
+                    cvv: cvv
+                };
+
+                const response = await fetch(`${API_BASE}/users/payment-methods`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(paymentData)
+                });
+
+                const data = await response.json();
+                updateOutput('profileOutput', `Payment Method Response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok) {
+                    updateOutput('profileOutput', 'Payment method added successfully! ✓');
+                } else {
+                    updateOutput('profileOutput', `Payment method failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                updateOutput('profileOutput', `Payment method error: ${error.message}`);
+                console.error('Payment method error:', error);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = {};
+            sessionStorage.removeItem('authToken');
+            sessionStorage.removeItem('currentUser');
+            
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('userInfo').classList.add('hidden');
+            
+            updateOutput('profileOutput', 'Logged out successfully');
+            
+            // Stop all active connections
+            stopOrderTracking();
+            stopRestaurantStream();
+            stopAnnouncementStream();
+        }
+
+        function showUserInfo() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.name || currentUser.email;
+            document.getElementById('userRole').textContent = currentUser.role;
+            document.getElementById('userId').textContent = currentUser.id;
+        }
+
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        // Mock implementations for other features (since backend doesn't have these yet)
+        
+        // Feature 2: Order Tracking (Mock)
+        function startOrderTracking() {
+            updateOutput('orderTrackingOutput', 'Starting mock order tracking...');
+            let status = 'confirmed';
+            const orderId = document.getElementById('trackOrderId').value;
+            
+            const interval = setInterval(() => {
+                const statuses = ['confirmed', 'preparing', 'ready', 'picked_up', 'delivered'];
+                const currentIndex = statuses.indexOf(status);
+                if (currentIndex < statuses.length - 1) {
+                    status = statuses[currentIndex + 1];
+                    updateOutput('orderTrackingOutput', `Order ${orderId}: ${status}`);
+                } else {
+                    clearInterval(interval);
+                    updateOutput('orderTrackingOutput', `Order ${orderId} completed!`);
+                }
+            }, 3000);
+        }
+
+        function stopOrderTracking() {
+            updateOutput('orderTrackingOutput', 'Order tracking stopped');
+        }
+
+        function updateOrderStatus() {
+            const orderId = document.getElementById('trackOrderId').value;
+            const statuses = ['confirmed', 'preparing', 'ready', 'picked_up', 'delivered'];
+            const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+            updateOutput('orderTrackingOutput', `Mock: Order ${orderId} status updated to: ${randomStatus}`);
+        }
+
+        // Feature 3: Driver Location (Mock)
+        function connectAsDriver() {
+            updateOutput('driverLocationOutput', 'Mock: Connected as driver');
+        }
+
+        function sendLocationUpdate() {
+            const latitude = parseFloat(document.getElementById('driverLat').value);
+            const longitude = parseFloat(document.getElementById('driverLng').value);
+            
+            updateOutput('driverLocationOutput', `Mock: Location updated - Lat: ${latitude}, Lng: ${longitude}`);
+            
+            // Simulate movement for demo
+            document.getElementById('driverLat').value = (latitude + (Math.random() - 0.5) * 0.001).toFixed(6);
+            document.getElementById('driverLng').value = (longitude + (Math.random() - 0.5) * 0.001).toFixed(6);
+        }
+
+        function trackDriverLocation() {
+            const orderId = document.getElementById('customerOrderId').value;
+            updateOutput('driverLocationOutput', `Mock: Tracking driver for order ${orderId}`);
+            
+            // Simulate receiving location updates
+            setInterval(() => {
+                const lat = (31.7683 + Math.random() * 0.01).toFixed(6);
+                const lng = (35.2137 + Math.random() * 0.01).toFixed(6);
+                updateOutput('driverLocationOutput', `Mock: Driver location - Lat: ${lat}, Lng: ${lng}`);
+            }, 5000);
+        }
+
+        // Feature 4: Restaurant Orders (Mock)
+        function createTestOrder() {
+            const restaurantId = document.getElementById('orderRestaurantId').value;
+            const orderId = Math.floor(Math.random() * 1000) + 1;
+            updateOutput('restaurantOutput', `Mock: Created order ${orderId} for restaurant ${restaurantId}`);
+        }
+
+        function startRestaurantStream() {
+            const restaurantId = document.getElementById('restaurantId').value;
+            updateOutput('restaurantOutput', `Mock: Started listening for orders for restaurant ${restaurantId}`);
+            
+            // Simulate incoming orders
+            setInterval(() => {
+                const orderId = Math.floor(Math.random() * 1000) + 1;
+                const customerName = 'Customer ' + Math.floor(Math.random() * 100);
+                updateOutput('restaurantOutput', `Mock: New order ${orderId} from ${customerName}`);
+            }, 10000);
+        }
+
+        function stopRestaurantStream() {
+            updateOutput('restaurantOutput', 'Mock: Stopped restaurant order stream');
+        }
+
+        // Feature 5: Support Chat (Mock)
+        function joinSupportChat() {
+            updateOutput('chatOutput', 'Mock: Joined support chat');
+        }
+
+        function sendChatMessage() {
+            const message = document.getElementById('chatMessage').value.trim();
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.innerHTML = `<strong>You:</strong> ${message} <small>(${new Date().toLocaleTimeString()})</small>`;
+            document.getElementById('chatOutput').appendChild(messageDiv);
+
+            document.getElementById('chatMessage').value = '';
+
+            // Mock support response
+            setTimeout(() => {
+                const responses = [
+                    "Thank you for your message. How can I help you today?",
+                    "I understand your concern. Let me look into that for you.",
+                    "Is there anything else I can help you with?",
+                    "That's a great question! Here's what I found..."
+                ];
+                const response = responses[Math.floor(Math.random() * responses.length)];
+                
+                const supportMsg = document.createElement('div');
+                supportMsg.className = 'message support';
+                supportMsg.innerHTML = `<strong>Support:</strong> ${response} <small>(${new Date().toLocaleTimeString()})</small>`;
+                document.getElementById('chatOutput').appendChild(supportMsg);
+            }, 2000);
+        }
+
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        let isTyping = false;
+        function toggleTyping() {
+            isTyping = !isTyping;
+            updateOutput('chatOutput', `Mock: You are ${isTyping ? 'typing' : 'not typing'}`);
+        }
+
+        // Feature 6: System Announcements (Mock)
+        function createAnnouncement() {
+            const title = document.getElementById('announcementTitle').value;
+            const message = document.getElementById('announcementMessage').value;
+
+            if (!title || !message) {
+                alert('Please enter both title and message');
+                return;
+            }
+
+            const announcementId = 'ann_' + Math.floor(Math.random() * 1000);
+            updateOutput('announcementOutput', `Mock: Announcement sent with ID: ${announcementId}`);
+        }
+
+        function startAnnouncementStream() {
+            updateOutput('announcementOutput', 'Mock: Connected to announcements stream...');
+            
+            // Simulate announcements
+            setTimeout(() => {
+                const announcement = document.createElement('div');
+                announcement.className = 'message system';
+                announcement.innerHTML = `<strong>System Update:</strong> Welcome to FoodFast! <small>(${new Date().toLocaleTimeString()})</small>`;
+                document.getElementById('announcementOutput').appendChild(announcement);
+            }, 3000);
+        }
+
+        function stopAnnouncementStream() {
+            updateOutput('announcementOutput', 'Mock: Announcement stream stopped');
+        }
+
+        // Feature 7: Image Upload (Mock)
+        function uploadImage() {
+            const restaurantId = document.getElementById('uploadRestaurantId').value;
+            const fileInput = document.getElementById('imageFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select an image file');
+                return;
+            }
+
+            if (!restaurantId) {
+                alert('Please enter a restaurant ID');
+                return;
+            }
+
+            const jobId = 'job_' + Math.floor(Math.random() * 1000);
+            updateOutput('imageUploadOutput', `Mock: Upload started - Job ID: ${jobId}, File: ${file.name}`);
+        }
+
+        function startImageProcessingStream() {
+            const restaurantId = document.getElementById('uploadRestaurantId').value;
+
+            if (!restaurantId) {
+                alert('Please enter a restaurant ID');
+                return;
+            }
+
+            updateOutput('imageUploadOutput', 'Mock: Connected to image processing stream...');
+            
+            // Simulate processing stages
+            const stages = ['uploaded', 'processing', 'resizing', 'optimizing', 'completed'];
+            let currentStage = 0;
+            
+            const interval = setInterval(() => {
+                if (currentStage < stages.length) {
+                    const jobId = 'job_123';
+                    const status = stages[currentStage];
+                    let message = `Mock: Job ${jobId}: ${status}`;
+                    
+                    if (status === 'completed') {
+                        message += ' - Image ready: /uploads/menu-item-123.jpg';
+                        clearInterval(interval);
+                    }
+                    
+                    updateOutput('imageUploadOutput', message);
+                    currentStage++;
+                }
+            }, 2000);
+        }
+
+        // Utility functions
+        function updateOutput(elementId, message) {
+            const output = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = `[${timestamp}] ${message}`;
+            output.appendChild(messageDiv);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = type;
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (orderTrackingSource) orderTrackingSource.close();
+            if (restaurantOrdersSource) restaurantOrdersSource.close();
+            if (announcementSource) announcementSource.close();
+            if (imageProcessingSource) imageProcessingSource.close();
+            if (socket) socket.disconnect();
+        });
+
+        // Periodic backend health check
+        setInterval(checkBackendConnection, 30000); // Check every 30 seconds

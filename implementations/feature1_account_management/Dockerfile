@@ -7,15 +7,18 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt 
+# Copy application files
+COPY ./implementations/feature1_account_management/requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY feature1_account_management.py .
+COPY ./implementations/feature1_account_management/feature1_account_management.py /app/
 
-EXPOSE 5001
-
+# Set environment variables
 ENV FLASK_APP=feature1_account_management.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5001
+ENV PYTHONUNBUFFERED=1
 
-CMD [ "python", "feature1_account_management.py" ]
+EXPOSE 5001
+
+CMD ["python", "feature1_account_management.py"]

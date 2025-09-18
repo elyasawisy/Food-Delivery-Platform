@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order Tracking Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .output { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin: 10px 0; 
+            min-height: 100px; 
+            background-color: #f9f9f9;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .status-update { 
+            margin: 5px 0; 
+            padding: 5px; 
+            border-left: 4px solid #007bff; 
+            background-color: white;
+        }
+        .status-confirmed { border-left-color: #28a745; }
+        .status-preparing { border-left-color: #ffc107; }
+        .status-ready { border-left-color: #17a2b8; }
+        .status-picked_up { border-left-color: #fd7e14; }
+        .status-delivered { border-left-color: #6f42c1; }
+        button { 
+            padding: 10px 15px; 
+            margin: 5px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 3px; 
+            cursor: pointer; 
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 3px; }
+        .order-details { background-color: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connection-status { padding: 5px 10px; border-radius: 3px; margin: 5px 0; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FoodFast Order Tracking Test</h1>
+        
+        <!-- Create Order Section -->
+        <div class="section">
+            <h2>Create Test Order</h2>
+            <div>
+                <label>Customer ID: </label>
+                <input type="number" id="customerId" value="1" min="1">
+                
+                <label>Restaurant ID: </label>
+                <input type="number" id="restaurantId" value="1" min="1">
+            </div>
+            <div>
+                <h4>Order Items:</h4>
+                <div id="orderItems">
+                    <div>
+                        <label>Menu Item ID: </label>
+                        <input type="number" class="menuItemId" value="1" min="1">
+                        <label>Quantity: </label>
+                        <input type="number" class="quantity" value="2" min="1">
+                    </div>
+                    <div>
+                        <label>Menu Item ID: </label>
+                        <input type="number" class="menuItemId" value="2" min="1">
+                        <label>Quantity: </label>
+                        <input type="number" class="quantity" value="1" min="1">
+                    </div>
+                </div>
+            </div>
+            <button onclick="createOrder()" id="createBtn">Create Order</button>
+            <button onclick="clearCreateOutput()">Clear</button>
+            <div id="createOutput" class="output"></div>
+        </div>
+
+        <!-- Track Order Section -->
+        <div class="section">
+            <h2>Track Order</h2>
+            <div>
+                <input type="number" id="trackOrderId" placeholder="Order ID" min="1">
+                <button onclick="startTracking()" id="trackBtn">Start Tracking</button>
+                <button onclick="stopTracking()" id="stopBtn" disabled>Stop Tracking</button>
+            </div>
+            
+            <div id="connectionStatus" class="connection-status disconnected">
+                Not Connected
+            </div>
+            
+            <div id="trackingOutput" class="output"></div>
+        </div>
+
+        <!-- Manual Status Update (for testing) -->
+        <div class="section">
+            <h2>Manual Status Update (Testing)</h2>
+            <div>
+                <input type="number" id="updateOrderId" placeholder="Order ID" min="1">
+                <select id="statusSelect">
+                    <option value="confirmed">Confirmed</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="ready">Ready</option>
+                    <option value="picked_up">Picked Up</option>
+                    <option value="delivered">Delivered</option>
+                </select>
+                <button onclick="updateOrderStatus()">Update Status</button>
+            </div>
+        </div>
+
+        <!-- Orders List -->
+        <div class="section">
+            <h2>Recent Orders</h2>
+            <button onclick="loadOrders()">Load Orders</button>
+            <div id="ordersOutput" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5002';
+        let eventSource = null;
+        let currentOrderId = null;
+
+        async function createOrder() {
+            const customerId = document.getElementById('customerId').value;
+            const restaurantId = document.getElementById('restaurantId').value;
+            
+            // Collect order items
+            const menuItemIds = document.querySelectorAll('.menuItemId');
+            const quantities = document.querySelectorAll('.quantity');
+            
+            const items = [];
+            for (let i = 0; i < menuItemIds.length; i++) {
+                const menuItemId = parseInt(menuItemIds[i].value);
+                const quantity = parseInt(quantities[i].value);
+                if (menuItemId && quantity) {
+                    items.push({
+                        menu_item_id: menuItemId,
+                        quantity: quantity
+                    });
+                }
+            }
+
+            const orderData = {
+                customer_id: parseInt(customerId),
+                restaurant_id: parseInt(restaurantId),
+                items: items
+            };
+
+            try {
+                document.getElementById('createBtn').disabled = true;
+                appendToOutput('createOutput', 'Creating order...', 'info');
+
+                const response = await fetch(`${BASE_URL}/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(orderData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const orderDetails = data.order_details;
+                    appendToOutput('createOutput', `Order created successfully!`, 'success');
+                    appendToOutput('createOutput', `Order ID: ${data.order_id}`, 'success');
+                    
+                    // Show order details
+                    const detailsHtml = `
+                        <div class="order-details">
+                            <strong>Order Details:</strong><br>
+                            Customer: ${orderDetails.customer_name}<br>
+                            Restaurant: ${orderDetails.restaurant_name}<br>
+                            Status: ${orderDetails.status}<br>
+                            Items: ${orderDetails.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}
+                        </div>
+                    `;
+                    document.getElementById('createOutput').innerHTML += detailsHtml;
+
+                    // Auto-fill tracking order ID and start tracking
+                    document.getElementById('trackOrderId').value = data.order_id;
+                    currentOrderId = data.order_id;
+                    
+                    // Auto-start tracking
+                    setTimeout(() => startTracking(), 1000);
+                } else {
+                    appendToOutput('createOutput', `Failed to create order: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Create order error:', error);
+                appendToOutput('createOutput', `Error: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('createBtn').disabled = false;
+            }
+        }
+
+        function startTracking() {
+            const orderId = document.getElementById('trackOrderId').value;
+            if (!orderId) {
+                alert('Please enter an order ID');
+                return;
+            }
+
+            // Stop existing tracking
+            stopTracking();
+
+            currentOrderId = orderId;
+            updateConnectionStatus('connecting', 'Connecting...');
+            
+            // Clear previous tracking output
+            document.getElementById('trackingOutput').innerHTML = '';
+            
+            // Start SSE connection
+            eventSource = new EventSource(`${BASE_URL}/orders/${orderId}/status/stream`);
+
+            eventSource.addEventListener('open', function(event) {
+                updateConnectionStatus('connected', 'Connected - Tracking Order ' + orderId);
+                document.getElementById('trackBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+            });
+
+            eventSource.addEventListener('status_update', function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleStatusUpdate(data);
+                } catch (e) {
+                    console.error('Error parsing status update:', e);
+                }
+            });
+
+            eventSource.addEventListener('heartbeat', function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Heartbeat:', data.timestamp);
+                } catch (e) {
+                    console.error('Error parsing heartbeat:', e);
+                }
+            });
+
+            eventSource.addEventListener('complete', function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    appendStatusUpdate('Order tracking completed: ' + data.message, 'delivered');
+                    stopTracking();
+                } catch (e) {
+                    console.error('Error parsing complete event:', e);
+                }
+            });
+
+            eventSource.addEventListener('error', function(event) {
+                console.error('SSE Error:', event);
+                updateConnectionStatus('disconnected', 'Connection Error');
+                appendStatusUpdate('Connection error occurred', 'error');
+                stopTracking();
+            });
+        }
+
+        function stopTracking() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            updateConnectionStatus('disconnected', 'Not Connected');
+            document.getElementById('trackBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        function handleStatusUpdate(data) {
+            console.log('Status update received:', data);
+            
+            if (data.order_details) {
+                // Initial order details
+                const details = data.order_details;
+                const detailsHtml = `
+                    <div class="order-details">
+                        <strong>Order #${details.id}</strong><br>
+                        Customer: ${details.customer_name}<br>
+                        Restaurant: ${details.restaurant_name}<br>
+                        Status: <strong>${details.status.toUpperCase()}</strong><br>
+                        Items: ${details.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}
+                    </div>
+                `;
+                document.getElementById('trackingOutput').innerHTML = detailsHtml;
+            } else if (data.status) {
+                // Status update
+                const timestamp = new Date(data.timestamp).toLocaleTimeString();
+                const message = `${timestamp} - Status: ${data.status.toUpperCase()}`;
+                appendStatusUpdate(message, data.status);
+            }
+        }
+
+        function appendStatusUpdate(message, status) {
+            const output = document.getElementById('trackingOutput');
+            const updateDiv = document.createElement('div');
+            updateDiv.className = `status-update status-${status}`;
+            updateDiv.innerHTML = message;
+            output.appendChild(updateDiv);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateConnectionStatus(status, message) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = `connection-status ${status}`;
+            statusEl.textContent = message;
+        }
+
+        function appendToOutput(outputId, message, type = 'info') {
+            const output = document.getElementById(outputId);
+            const timestamp = new Date().toLocaleTimeString();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status-update status-${type}`;
+            messageDiv.innerHTML = `${timestamp} - ${message}`;
+            output.appendChild(messageDiv);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearCreateOutput() {
+            document.getElementById('createOutput').innerHTML = '';
+        }
+
+        async function updateOrderStatus() {
+            const orderId = document.getElementById('updateOrderId').value;
+            const status = document.getElementById('statusSelect').value;
+
+            if (!orderId) {
+                alert('Please enter an order ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/orders/${orderId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ status: status })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    alert(`Status updated to: ${status}`);
+                } else {
+                    alert(`Failed to update status: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Update status error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function loadOrders() {
+            try {
+                const response = await fetch(`${BASE_URL}/orders`);
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const output = document.getElementById('ordersOutput');
+                    
+                    if (data.orders.length > 0) {
+                        let html = '<table border="1" style="width: 100%; border-collapse: collapse;">';
+                        html += '<tr><th>ID</th><th>Customer</th><th>Restaurant</th><th>Status</th><th>Created</th><th>Actions</th></tr>';
+                        
+                        data.orders.forEach(order => {
+                            const createdAt = new Date(order.created_at).toLocaleString();
+                            html += `
+                                <tr>
+                                    <td>${order.id}</td>
+                                    <td>${order.customer_name}</td>
+                                    <td>${order.restaurant_name}</td>
+                                    <td><span class="status-${order.status}">${order.status}</span></td>
+                                    <td>${createdAt}</td>
+                                    <td>
+                                        <button onclick="trackOrderById(${order.id})">Track</button>
+                                        <button onclick="viewOrderDetails(${order.id})">Details</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += '</table>';
+                        output.innerHTML = html;
+                    } else {
+                        output.innerHTML = '<p>No orders found.</p>';
+                    }
+                } else {
+                    document.getElementById('ordersOutput').innerHTML = `<p>Error loading orders: ${data.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Load orders error:', error);
+                document.getElementById('ordersOutput').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        function trackOrderById(orderId) {
+            document.getElementById('trackOrderId').value = orderId;
+            startTracking();
+        }
+
+        async function viewOrderDetails(orderId) {
+            try {
+                const response = await fetch(`${BASE_URL}/orders/${orderId}`);
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const order = data.order;
+                    const itemsList = order.items.map(item => 
+                        `${item.name} - ${item.price.toFixed(2)} x ${item.quantity} = ${(item.price * item.quantity).toFixed(2)}`
+                    ).join('\n');
+                    
+                    const total = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    
+                    alert(`
+Order #${order.id} Details:
+Customer: ${order.customer_name}
+Restaurant: ${order.restaurant_name}
+Status: ${order.status}
+Created: ${new Date(order.created_at).toLocaleString()}
+
+Items:
+${itemsList}
+
+Total: ${total.toFixed(2)}
+                    `);
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('View order error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Test connection on page load
+        window.onload = function() {
+            fetch(`${BASE_URL}/health`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Service health check:', data);
+                    if (data.status === 'ok') {
+                        appendToOutput('createOutput', 'Connected to Order Tracking Service', 'success');
+                    } else {
+                        appendToOutput('createOutput', 'Service health check failed', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Health check failed:', error);
+                    appendToOutput('createOutput', 'Failed to connect to service', 'error');
+                });
+        };
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopTracking();
+        });
+    </script>
+</body>
+</html>

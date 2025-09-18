@@ -1,12 +1,46 @@
 import requests
 import json
+import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
+# Configure retry strategy
+retry_strategy = Retry(
+    total=5,
+    backoff_factor=0.5,
+    status_forcelist=[500, 502, 503, 504],
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+
+# Create session with retry strategy
+session = requests.Session()
+session.mount("http://", adapter)
+session.mount("https://", adapter)
+
+# Update the BASE_URL to match the exposed port
 BASE_URL = "http://localhost:5001"
+
+def wait_for_service():
+    """Wait for service to be available"""
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        try:
+            response = session.get(f"{BASE_URL}/health", timeout=5)
+            if response.status_code == 200:
+                print("Service is available")
+                return True
+        except requests.exceptions.RequestException as e:
+            print(f"Waiting for service... Attempt {attempt + 1}/{max_attempts}")
+            time.sleep(3)
+    return False
 
 def test_health():
     """Test health endpoint"""
-    response = requests.get(f"{BASE_URL}/health")
-    print(f"Health Check: {response.status_code} - {response.json()}")
+    try:
+        response = session.get(f"{BASE_URL}/health")
+        print(f"Health Check: {response.status_code} - {response.json()}")
+    except requests.exceptions.RequestException as e:
+        print(f"Health Check failed: {str(e)}")
 
 def test_user_registration():
     """Test user registration"""
@@ -102,7 +136,12 @@ def run_tests():
     """Run all tests"""
     print("=== Testing Feature 1: Account Management ===\n")
     
-    # Test health
+    # Wait for service to be available
+    if not wait_for_service():
+        print("Service not available after maximum attempts")
+        return
+    
+    # Continue with tests
     test_health()
     
     # Test registration

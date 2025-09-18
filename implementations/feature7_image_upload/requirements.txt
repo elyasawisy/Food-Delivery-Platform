@@ -1,0 +1,11 @@
+Flask
+redis
+psycopg2-binary
+python-dotenv
+celery
+Pillow
+
+
+
+
+

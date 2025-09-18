@@ -7,26 +7,38 @@ import re
 import uuid
 from datetime import datetime, timedelta
 import jwt
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'prod-super-long-random-key-here')
 
 # PostgreSQL configuration
 db_config = {
-    'host': os.getenv('DB_HOST', 'postgres'),
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'database': os.getenv('DB_NAME', 'foodfast_db'),
     'user': os.getenv('DB_USER', 'foodfast'),
     'password': os.getenv('DB_PASSWORD', 'foodfast123'),
-    'database': os.getenv('DB_NAME', 'foodfast_db'),
-    'port': os.getenv('DB_PORT', 5432)
+    'port': int(os.getenv('DB_PORT', 5432))
 }
 
 def get_db_connection():
-    """Create a new database connection."""
-    try:
-        return psycopg2.connect(**db_config)
-    except psycopg2.Error as e:
-        print(f"Error connecting to database: {e}")
-        return None
+    """Create a new database connection with retries."""
+    max_retries = 5
+    retry_delay = 2  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempting database connection (attempt {attempt + 1}/{max_retries})")
+            print(f"Connection params: host={db_config['host']}, port={db_config['port']}, db={db_config['database']}")
+            conn = psycopg2.connect(**db_config)
+            print(f"Successfully connected to database on attempt {attempt + 1}")
+            return conn
+        except psycopg2.Error as e:
+            print(f"Database connection attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+    print("All database connection attempts failed")
+    return None
 
 def validate_email(email):
     """Validate email format."""
@@ -371,4 +383,13 @@ def internal_error(error):
     return jsonify({"message": "Internal server error"}), 500
 
 if __name__ == "__main__":
+    # Test database connection on startup
+    print("Testing database connection...")
+    conn = get_db_connection()
+    if conn:
+        print("Database connection successful")
+        conn.close()
+    else:
+        print("Failed to connect to database")
+    
     app.run(host="0.0.0.0", port=5001, debug=True)

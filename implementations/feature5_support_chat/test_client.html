@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Support Chat Test Client</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .chat-container { max-width: 600px; margin: 0 auto; }
+        .messages { height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        .message { margin-bottom: 10px; padding: 5px; border-radius: 5px; }
+        .my-message { background-color: #007bff; color: white; text-align: right; }
+        .other-message { background-color: #f1f1f1; }
+        .input-container { display: flex; gap: 10px; }
+        .input-container input { flex: 1; padding: 10px; }
+        .input-container button { padding: 10px 20px; }
+        .status { margin: 10px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .success { background-color: #d4edda; color: #155724; }
+        .typing { font-style: italic; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Support Chat Test Client</h1>
+        
+        <div>
+            <label>Your User ID: </label>
+            <input type="number" id="userId" value="1" min="1">
+            
+            <label>Support Agent ID: </label>
+            <input type="number" id="supportId" value="2" min="1">
+            
+            <button onclick="joinChat()">Join Chat</button>
+            <button onclick="leaveChat()">Leave Chat</button>
+        </div>
+        
+        <div id="status" class="status">Not connected</div>
+        
+        <div id="messages" class="messages"></div>
+        
+        <div id="typing" class="typing" style="display: none;"></div>
+        
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="Type your message..." disabled>
+            <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let currentRoom = null;
+        let currentUserId = null;
+        let currentSupportId = null;
+        let typingTimeout = null;
+
+        // Initialize connection
+        function initSocket() {
+            socket = io('http://localhost:5005');
+            
+            socket.on('connect', function() {
+                updateStatus('Connected to server', 'success');
+            });
+            
+            socket.on('disconnect', function() {
+                updateStatus('Disconnected from server', 'error');
+            });
+            
+            socket.on('connected', function(data) {
+                console.log('Server says:', data.status);
+            });
+            
+            socket.on('joined_chat', function(data) {
+                currentRoom = data.room;
+                updateStatus(`Joined chat room: ${data.room}`, 'success');
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                
+                // Display chat history
+                if (data.history && data.history.length > 0) {
+                    data.history.forEach(function(msg) {
+                        displayMessage(msg);
+                    });
+                }
+            });
+            
+            socket.on('left_chat', function(data) {
+                updateStatus('Left chat room', 'success');
+                currentRoom = null;
+                document.getElementById('messageInput').disabled = true;
+                document.getElementById('sendBtn').disabled = true;
+            });
+            
+            socket.on('receive_message', function(data) {
+                displayMessage(data);
+            });
+            
+            socket.on('message_delivered', function(data) {
+                console.log('Message delivered:', data);
+            });
+            
+            socket.on('typing_status', function(data) {
+                const typingDiv = document.getElementById('typing');
+                if (data.is_typing) {
+                    typingDiv.textContent = `${data.sender_name} is typing...`;
+                    typingDiv.style.display = 'block';
+                } else {
+                    typingDiv.style.display = 'none';
+                }
+            });
+            
+            socket.on('user_joined', function(data) {
+                updateStatus(`User ${data.user_id} joined the chat`, 'success');
+            });
+            
+            socket.on('user_left', function(data) {
+                updateStatus(`User ${data.user_id} left the chat`, 'success');
+            });
+            
+            socket.on('error', function(data) {
+                updateStatus(`Error: ${data.message}`, 'error');
+            });
+        }
+        
+        function joinChat() {
+            currentUserId = parseInt(document.getElementById('userId').value);
+            currentSupportId = parseInt(document.getElementById('supportId').value);
+            
+            if (!currentUserId || !currentSupportId) {
+                alert('Please enter valid user IDs');
+                return;
+            }
+            
+            socket.emit('join_chat', {
+                user_id: currentUserId,
+                support_agent_id: currentSupportId
+            });
+        }
+        
+        function leaveChat() {
+            if (currentRoom) {
+                socket.emit('leave_chat', {
+                    room: currentRoom,
+                    user_id: currentUserId
+                });
+            }
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !currentRoom) return;
+            
+            socket.emit('send_message', {
+                room: currentRoom,
+                message: message,
+                sender_id: currentUserId,
+                receiver_id: currentSupportId
+            });
+            
+            input.value = '';
+            stopTyping();
+        }
+        
+        function displayMessage(data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (data.sender_id === currentUserId ? 'my-message' : 'other-message');
+            
+            const time = new Date(data.created_at).toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <strong>${data.sender_name || 'User ' + data.sender_id}:</strong> ${data.message}
+                <br><small>${time}</small>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'success') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+        
+        function startTyping() {
+            if (currentRoom && currentUserId) {
+                socket.emit('typing', {
+                    room: currentRoom,
+                    sender_id: currentUserId,
+                    is_typing: true
+                });
+            }
+        }
+        
+        function stopTyping() {
+            if (currentRoom && currentUserId) {
+                socket.emit('typing', {
+                    room: currentRoom,
+                    sender_id: currentUserId,
+                    is_typing: false
+                });
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            } else {
+                startTyping();
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(stopTyping, 1000);
+            }
+        });
+        
+        // Initialize when page loads
+        window.onload = function() {
+            initSocket();
+        };
+    </script>
+</body>
+</html>

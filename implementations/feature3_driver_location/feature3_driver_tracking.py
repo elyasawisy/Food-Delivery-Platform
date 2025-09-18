@@ -6,47 +6,37 @@ import psycopg2
 import psycopg2.extras
 import json
 from datetime import datetime
-import time
-
+import eventlet
+eventlet.monkey_patch()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'ely0s123456')
 
-# Initialize SocketIO without specific async mode
+# Initialize SocketIO with eventlet
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
+    async_mode='eventlet',
     logger=True,
     engineio_logger=True
 )
 
-# PostgreSQL configuration
+#   #2: PostgreSQL configuration
 db_config = {
-    'host': os.getenv('DB_HOST', 'localhost'),  # Changed from 'postgres'
+    'host': os.getenv('DB_HOST', 'postgres'),
     'user': os.getenv('DB_USER', 'foodfast'),
     'password': os.getenv('DB_PASSWORD', 'foodfast123'),
-    'database': os.getenv('DB_NAME', 'foodfast_db'),
-    'port': int(os.getenv('DB_PORT', 5432))
+    'database': os.getenv('DB_NAME', 'foodfast_db'),  
+    'port': os.getenv('DB_PORT', 5432)
 }
 
 def get_db_connection():
-    """Create database connection with retries"""
-    max_retries = 5
-    retry_delay = 2  # seconds
-    
-    for attempt in range(max_retries):
-        try:
-            print(f"Attempting database connection (attempt {attempt + 1}/{max_retries})")
-            print(f"Connection params: host={db_config['host']}, port={db_config['port']}, db={db_config['database']}")
-            conn = psycopg2.connect(**db_config)
-            print(f"Successfully connected to database on attempt {attempt + 1}")
-            return conn
-        except psycopg2.Error as e:
-            print(f"Database connection attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-    print("All database connection attempts failed")
-    return None
+    """Create database connection with error handling"""
+    try:
+        return psycopg2.connect(**db_config)
+    except psycopg2.Error as e:
+        print(f"Database connection error: {e}")
+        return None
 
 #   #1: Initialize Redis with better error handling
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -350,12 +340,19 @@ def get_driver_location(order_id):
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    # Test database connection on startup
+    # Test connections on startup
+    print("Testing database connection...")
     conn = get_db_connection()
     if conn:
         print("Database connection successful")
         conn.close()
     else:
         print("Failed to connect to database")
+    
+    # Test Redis connection
+    if r:
+        print("Redis connection successful")
+    else:
+        print("Redis connection failed")
     
     socketio.run(app, host="0.0.0.0", port=5003, debug=True)

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FoodFast Announcements Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .admin-section { background-color: #f8f9fa; }
+        .user-section { background-color: #e3f2fd; }
+        .announcement { border: 1px solid #ccc; margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .priority-high { border-left: 4px solid #dc3545; }
+        .priority-urgent { border-left: 4px solid #ff0000; background-color: #fff5f5; }
+        .priority-normal { border-left: 4px solid #28a745; }
+        .priority-low { border-left: 4px solid #6c757d; }
+        .unread { background-color: #fff3cd; }
+        .form-group { margin: 10px 0; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; 
+        }
+        .form-group textarea { height: 80px; }
+        button { 
+            padding: 10px 20px; margin: 5px; background-color: #007bff; 
+            color: white; border: none; border-radius: 3px; cursor: pointer; 
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #cce7ff; color: #004085; }
+        .stats { display: flex; gap: 20px; }
+        .stat-box { 
+            background: white; padding: 15px; border-radius: 5px; 
+            border: 1px solid #ddd; flex: 1; text-align: center;
+        }
+        .stat-number { font-size: 24px; font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FoodFast Announcements System Test</h1>
+        
+        <!-- Admin Section -->
+        <div class="section admin-section">
+            <h2>Admin Panel - Send Announcements</h2>
+            <form id="announceForm">
+                <div class="form-group">
+                    <label for="title">Title:</label>
+                    <input type="text" id="title" required placeholder="Announcement title">
+                </div>
+                <div class="form-group">
+                    <label for="message">Message:</label>
+                    <textarea id="message" required placeholder="Announcement message"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="type">Type:</label>
+                    <select id="type">
+                        <option value="general">General</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="promotion">Promotion</option>
+                        <option value="feature">New Feature</option>
+                        <option value="outage">Service Outage</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="priority">Priority:</label>
+                    <select id="priority">
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="expires">Expires At:</label>
+                    <input type="datetime-local" id="expires">
+                </div>
+                <button type="submit">Send Announcement</button>
+            </form>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-number" id="totalAnnouncements">0</div>
+                    <div>Total Announcements</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="activeAnnouncements">0</div>
+                    <div>Active Announcements</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="readDeliveries">0</div>
+                    <div>Read Deliveries</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Section -->
+        <div class="section user-section">
+            <h2>User View - Receive Announcements</h2>
+            <div class="form-group">
+                <label for="userId">User ID:</label>
+                <input type="number" id="userId" value="1" min="1">
+            </div>
+            <button onclick="startAnnouncementStream()">Start Listening</button>
+            <button onclick="stopAnnouncementStream()">Stop Listening</button>
+            <button onclick="loadAnnouncements()">Load History</button>
+
+            <div id="announcements"></div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        const BASE_URL = 'http://localhost:5006';
+
+        // Test connection
+        fetch(`${BASE_URL}/health`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('Service status:', data);
+                loadStats();
+            })
+            .catch(error => console.error('Connection error:', error));
+
+        // Send announcement
+        document.getElementById('announceForm').onsubmit = function(e) {
+            e.preventDefault();
+            
+            const data = {
+                title: document.getElementById('title').value,
+                message: document.getElementById('message').value,
+                type: document.getElementById('type').value,
+                priority: document.getElementById('priority').value,
+                expires_at: document.getElementById('expires').value || null
+            };
+
+            fetch(`${BASE_URL}/announce`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                mode: 'cors',
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Announcement sent successfully!');
+                    loadStats();
+                    document.getElementById('announceForm').reset();
+                } else {
+                    alert('Failed to send announcement: ' + result.error);
+                }
+            })
+            .catch(error => alert('Error: ' + error));
+        };
+
+        // Start SSE stream
+        function startAnnouncementStream() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+
+            stopAnnouncementStream();
+
+            try {
+                eventSource = new EventSource(`${BASE_URL}/announcements/stream/${userId}`);
+                
+                eventSource.onopen = () => {
+                    console.log('SSE connection opened');
+                    addAnnouncement({
+                        title: 'System',
+                        message: 'Connected to announcement stream',
+                        type: 'info'
+                    });
+                };
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        // Handle heartbeat
+                        if (data.type === 'heartbeat') {
+                            console.log('Heartbeat received at:', data.timestamp);
+                            return;
+                        }
+                        
+                        // Handle other messages
+                        if (data.error) {
+                            console.error('SSE error:', data.error);
+                            addAnnouncement({
+                                title: 'Error',
+                                message: data.error,
+                                type: 'error'
+                            });
+                            return;
+                        }
+
+                        addAnnouncement(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                    }
+                };
+
+                eventSource.onerror = (error) => {
+                    console.error('SSE connection error:', error);
+                    addAnnouncement({
+                        title: 'Error',
+                        message: 'Connection error occurred',
+                        type: 'error'
+                    });
+                    
+                    // Attempt to reconnect after 5 seconds
+                    setTimeout(() => {
+                        if (eventSource) {
+                            eventSource.close();
+                            startAnnouncementStream();
+                        }
+                    }, 5000);
+                };
+            } catch (error) {
+                console.error('Error creating EventSource:', error);
+                addAnnouncement({
+                    title: 'Error',
+                    message: 'Failed to create connection',
+                    type: 'error'
+                });
+            }
+        }
+
+        function stopAnnouncementStream() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                addAnnouncement({
+                    title: 'System',
+                    message: 'Disconnected from announcement stream',
+                    type: 'info'
+                });
+            }
+        }
+
+        // Load statistics
+        function loadStats() {
+            fetch(`${BASE_URL}/announcements/stats`)
+                .then(response => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        const stats = data.stats;
+                        document.getElementById('totalAnnouncements').textContent = stats.total_announcements || 0;
+                        document.getElementById('activeAnnouncements').textContent = stats.active_announcements || 0;
+                        document.getElementById('readDeliveries').textContent = stats.read_deliveries || 0;
+                    }
+                })
+                .catch(error => console.error('Error loading stats:', error));
+        }
+
+        // Load announcement history
+        function loadAnnouncements() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+
+            fetch(`${BASE_URL}/announcements/${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        const container = document.getElementById('announcements');
+                        container.innerHTML = '<h3>Announcement History</h3>';
+                        data.data.forEach(announcement => addAnnouncement(announcement));
+                    } else {
+                        alert('Failed to load announcements: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => alert('Error: ' + error));
+        }
+
+        // Add announcement to display
+        function addAnnouncement(data) {
+            const container = document.getElementById('announcements');
+            const div = document.createElement('div');
+            div.className = `announcement priority-${data.priority || 'normal'}`;
+            if (!data.read_at) div.className += ' unread';
+
+            div.innerHTML = `
+                <strong>${data.title}</strong>
+                <p>${data.message}</p>
+                <small>
+                    ${data.type ? `Type: ${data.type}` : ''} 
+                    ${data.created_at ? `| Created: ${new Date(data.created_at).toLocaleString()}` : ''}
+                    ${data.expires_at ? `| Expires: ${new Date(data.expires_at).toLocaleString()}` : ''}
+                </small>
+            `;
+
+            container.insertBefore(div, container.firstChild);
+        }
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            stopAnnouncementStream();
+        };
+
+        // Initialize by loading stats
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            setInterval(loadStats, 30000); // Refresh stats every 30 seconds
+        });
+    </script>
+</body>
+</html>

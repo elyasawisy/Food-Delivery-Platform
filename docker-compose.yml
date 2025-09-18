@@ -1,0 +1,271 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: foodfast
+      POSTGRES_PASSWORD: foodfast123
+      POSTGRES_DB: foodfast_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodfast -d foodfast_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5  
+    networks:
+      - foodfast_network
+
+  redis:
+    image: redis:7
+    container_name: redis_cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foodfast_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_broker
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  account_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature1_account_management/Dockerfile
+    container_name: foodfast_account_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://foodfast:foodfast123@postgres:5432/foodfast_db
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      SECRET_KEY: 91d42fd3d37ec4b47b4980f0c0ca4aaa04bfee57bcb2e0b10db4edcce279fd45
+    ports:
+      - "5001:5001"  # Change from 5001:5000 to 5001:5001 to match Flask port
+    networks:
+      - foodfast_network
+
+
+
+  order_tracking_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature2_order_tracking/Dockerfile
+    container_name: foodfast_order_tracking_backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://foodfast:foodfast123@postgres:5432/foodfast_db
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+    ports:
+      - "5002:5000"
+    networks:
+      - foodfast_network
+
+
+  driver_location_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature3_driver_location/Dockerfile
+    container_name: foodfast_driver_location_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    environment:
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: 91d42fd3d37ec4b47b4980f0c0ca4aaa04bfee57bcb2e0b10db4edcce279fd45
+    ports:
+      - "5003:5003"
+    networks:
+      - foodfast_network
+
+  restaurant_notifications_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature4_restaurant_notifications/Dockerfile
+    container_name: foodfast_restaurant_notifications_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      FLASK_APP: feature4_restaurant_notifications.py
+      FLASK_RUN_HOST: 0.0.0.0
+      FLASK_RUN_PORT: 5004
+    volumes:
+      - ./implementations/feature4_restaurant_notifications:/app
+    ports:
+      - "5004:5004"
+    networks:
+      - foodfast_network
+
+  support_chat_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature5_support_chat/Dockerfile
+    container_name: foodfast_support_chat_backend
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://foodfast:foodfast123@postgres:5432/foodfast_db
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      SECRET_KEY: 91d42fd3d37ec4b47b4980f0c0ca4aaa04bfee57bcb2e0b10db4edcce279fd45
+    volumes:
+      - .:/app
+    ports:
+      - "5005:5000"
+    networks:
+      - foodfast_network
+
+  announcements_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature6_announcements/Dockerfile
+    container_name: foodfast_announcements_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_NAME: foodfast_db
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "5006:5006"
+    volumes:
+      - ./implementations/feature6_announcements:/app
+    networks:
+      - foodfast_network
+
+  image_upload_backend:
+    build:
+      context: .
+      dockerfile: ./implementations/feature7_image_upload/Dockerfile
+    container_name: foodfast_image_upload_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - ./implementations/feature7_image_upload:/app
+      - image_storage:/app/uploads
+      - image_cache:/tmp/processed
+    ports:
+      - "5007:5000"
+    networks:
+      - foodfast_network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: ./implementations/feature7_image_upload/Dockerfile
+    container_name: foodfast_celery_worker
+    command: celery -A celery worker --loglevel=info
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_USER: foodfast
+      DB_PASSWORD: foodfast123
+      DB_NAME: foodfast_db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      C_FORCE_ROOT: "true"
+    volumes:
+      - ./implementations/feature7_image_upload:/app
+      - image_storage:/app/uploads
+      - image_cache:/tmp/processed
+    working_dir: /app
+    networks:
+      - foodfast_network
+
+  frontend:
+    image: nginx:alpine
+    container_name: foodfast_frontend
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "8080:80"
+
+networks:
+  foodfast_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  image_storage:
+  image_cache:
